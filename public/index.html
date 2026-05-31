@@ -255,6 +255,13 @@
     color: var(--accent2); font-size: 10px; padding: 2px 8px; border-radius: 4px;
     margin-top: 6px; letter-spacing: 0.5px;
   }
+  .p-fields-wrap { display: flex; flex-direction: column; gap: 7px; padding: 10px 12px; }
+  .p-field { display: flex; flex-direction: column; gap: 2px; }
+  .p-title { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+  .p-req { color: var(--accent2); }
+  .p-val { font-size: 12px; color: var(--text); line-height: 1.5; }
+  .p-repeat .p-title { color: var(--accent); }
+  .p-repeat .p-val { color: var(--text); opacity: .85; }
 </style>
 </head>
 <body>
@@ -305,7 +312,7 @@
 
 <script>
 // ─── CONFIG ──────────────────────────────────────────────
-const BLACKLIST_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTBn_d3gBo_DtApt4X_2q3mLgqgxuuqy1CCSrGJpRThoU-NMw1ARlEoCfWqxhNvDeEiBsXpvVehTPxs/pub?gid=0&single=true&output=tsv';   // <- dán link CSV Google Sheet vào đây
+const BLACKLIST_URL = '';   // <- dán link CSV Google Sheet vào đây
 
 let rows = [];
 let rowId = 0;
@@ -334,8 +341,13 @@ async function fetchBlacklist() {
       if (!line.trim()) continue;
       const cols = line.split(sep);
       // Quét tất cả cột, lấy cột nào có text không phải số
-      const c = (cols[1] || '').replace(/^"|"$/g, '').trim();
-      let val = c;
+      let val = '';
+      for (const col of cols) {
+        const c = col.replace(/^"|"$/g, '').trim();
+        if (c && !/^\d+$/.test(c) && !/^https?:\/\//i.test(c)) {
+          val = c; break;
+        }
+      }
       if (val) niches.push(val.toLowerCase());
     }
     blacklistNiches = [...new Set(niches)];
@@ -555,6 +567,19 @@ async function callGemini(imgB64, imgMime, productInfo) {
   return res.json();
 }
 
+async function callGeminiPersonalize(imgB64, imgMime, productInfo) {
+  const res = await fetch('/api/gemini', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'gen-personalize', imgB64, imgMime, productInfo })
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.error || 'Gen personalize failed');
+  }
+  return res.json();
+}
+
 // ─── MAIN RUN ────────────────────────────────────────────
 async function runAll() {
   const btn = document.getElementById('runBtn');
@@ -607,14 +632,18 @@ async function runAll() {
         }
       }
 
-      // ── Bước 2: Gen listing
+      // ── Bước 2: Gen listing + personalize (parallel)
       setProgress(i, total, `Gemini analyzing ${i+1}/${total}...`);
-      const result = await callGemini(imgB64, imgMime, productInfo);
+      const [result, personalizeResult] = await Promise.all([
+        callGemini(imgB64, imgMime, productInfo),
+        callGeminiPersonalize(imgB64, imgMime, productInfo).catch(() => null)
+      ]);
 
       updateCard(cardId, {
         title: result.title, tags: result.tags,
         imageLinks, thumbUrl,
-        isLocalOnly: !!row.imageDataUrl && !row.url.trim()
+        isLocalOnly: !!row.imageDataUrl && !row.url.trim(),
+        personalizeFields: personalizeResult?.fields || null
       });
     } catch(e) {
       updateCardError(cardId, e.message);
@@ -653,7 +682,7 @@ function addPendingCard(index) {
   return id;
 }
 
-function updateCard(id, { title, tags, imageLinks, thumbUrl, isLocalOnly }) {
+function updateCard(id, { title, tags, imageLinks, thumbUrl, isLocalOnly, personalizeFields }) {
   const card = document.getElementById(id);
   if (!card) return;
   const tLen = (title||'').length;
@@ -683,6 +712,41 @@ function updateCard(id, { title, tags, imageLinks, thumbUrl, isLocalOnly }) {
       </div>`;
   }
 
+  // Build personalize section
+  let personalizeSection = '';
+  if (personalizeFields && personalizeFields.length) {
+    const rows = personalizeFields.map(f => {
+      if (f.type === 'list') {
+        return `<div class="p-field"><span class="p-title">${escHtml(f.title)}${f.required ? ' <span class="p-req">*</span>' : ''}</span><span class="p-val">${(f.options||[]).map(escHtml).join(' / ')}</span></div>`;
+      } else if (f.type === 'text') {
+        const ex = f.example ? ` (e.g. ${escHtml(f.example)})` : '';
+        return `<div class="p-field"><span class="p-title">${escHtml(f.title)}${f.required ? ' <span class="p-req">*</span>' : ''}</span><span class="p-val">${escHtml(f.instruction||'')}${ex}</span></div>`;
+      } else if (f.type === 'repeat') {
+        return `<div class="p-field p-repeat"><span class="p-title">${escHtml(f.label)}</span><span class="p-val">${escHtml(f.subfields||'')}</span></div>`;
+      }
+      return '';
+    }).filter(Boolean).join('');
+
+    const copyText = personalizeFields.map(f => {
+      if (f.type === 'list') return `${f.title}${f.required?' (required)':''}: ${(f.options||[]).join(' / ')}`;
+      if (f.type === 'text') return `${f.title}${f.required?' (required)':''}: ${f.instruction||''}${f.example?' (e.g. '+f.example+')':''}`;
+      if (f.type === 'repeat') return `${f.label}: ${f.subfields||''}`;
+      return '';
+    }).filter(Boolean).join('\n');
+
+    personalizeSection = `
+      <div class="field">
+        <div class="field-lbl">Etsy Personalization <span class="char-ok">ready to copy</span></div>
+        <div class="field-val p-fields-wrap">${rows}</div>
+        <div class="action-row">
+          <button class="copy-btn" id="cppersonalize-${id}">📋 Copy personalization</button>
+        </div>
+      </div>`;
+
+    // Store copyText for later event binding
+    card._personalizeCopyText = copyText;
+  }
+
   card.innerHTML = `
     ${imgEl}
     <div>
@@ -704,6 +768,7 @@ function updateCard(id, { title, tags, imageLinks, thumbUrl, isLocalOnly }) {
         </div>
       </div>
       ${imagesSection}
+      ${personalizeSection}
     </div>`;
 
   // Attach events safely (no inline JSON escaping issues)
@@ -718,6 +783,9 @@ function updateCard(id, { title, tags, imageLinks, thumbUrl, isLocalOnly }) {
 
   const btnCpLinks = document.getElementById(`cplinks-${id}`);
   if (btnCpLinks) btnCpLinks.addEventListener('click', () => cp(btnCpLinks, imageLinks.join('\n')));
+
+  const btnCpPersonalize = document.getElementById(`cppersonalize-${id}`);
+  if (btnCpPersonalize) btnCpPersonalize.addEventListener('click', () => cp(btnCpPersonalize, card._personalizeCopyText || ''));
 }
 
 function updateCardBlocked(id, detectedNiche, matchedEntry, thumbUrl) {
