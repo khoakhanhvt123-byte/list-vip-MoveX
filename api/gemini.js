@@ -14,7 +14,6 @@ export default async function handler(req, res) {
   let prompt, temperature;
 
   if (type === 'tm-check') {
-    // ── Bước 1: TM check
     if (!blacklistNiches || blacklistNiches.length === 0) {
       return res.json({ matched: false });
     }
@@ -43,7 +42,6 @@ Return exactly one of:
     temperature = 0;
 
   } else if (type === 'gen-listing') {
-    // ── Bước 2: Gen title + tags
     const ctx = productInfo ? `Product name: "${productInfo.productTitle}". Description: "${productInfo.description}".` : '';
     prompt = `You are an expert Etsy SEO copywriter for personalized/POD products.
 Analyze this product image and determine its category automatically. ${ctx}
@@ -55,8 +53,56 @@ Rules:
 - All English`;
     temperature = 0.7;
 
+  } else if (type === 'gen-personalize') {
+    const ctx = productInfo ? `Product name: "${productInfo.productTitle}". Store description: "${productInfo.description}".` : '';
+    prompt = `You are an Etsy listing expert. Analyze this product image and generate the Personalization section for an Etsy listing.
+
+${ctx}
+
+RULES FOR ANALYSIS:
+1. Look at the product carefully — identify ALL customizable elements (names, numbers, genders, poses, colors, styles, fonts, dates, messages, etc.)
+2. For each element, decide the field type:
+   - TEXT BOX: buyer needs to type free text (names, dates, messages, custom words)
+   - LIST OF OPTIONS: buyer picks from predefined choices (gender, pose/style variants, colors, fonts, sizes)
+3. For elements that repeat per person/kid/pet: group into ONE "each [person]" line showing all sub-fields
+4. For visual selection fields (poses, avatars, styles shown as images): add note "(see photo, left→right top→bottom = 1, 2, 3...)"
+5. Keep it SHORT and CLEAR — buyers must instantly understand what to provide
+
+OUTPUT FORMAT (return ONLY valid JSON, no markdown):
+{
+  "fields": [
+    {
+      "type": "list",
+      "title": "...",
+      "options": ["opt1", "opt2", ...],
+      "required": true
+    },
+    {
+      "type": "text",
+      "title": "...",
+      "instruction": "...",
+      "example": "...",
+      "required": true
+    },
+    {
+      "type": "repeat",
+      "label": "Each [person/kid/pet]",
+      "subfields": "Name | Boy/Girl | Pose 1-6 (see photo, left→right top→bottom = 1,2,3...)"
+    }
+  ]
+}
+
+PRINCIPLES:
+- Field titles must be specific (not generic like "Personalization")
+- List options must be exhaustive and in logical order
+- Text instructions must say WHERE/HOW the text appears on the product
+- If a visual selection exists (poses, avatars, fonts shown as images), ALWAYS add the photo-reading note
+- Repeating fields (per kid/pet/person) MUST be collapsed into one "repeat" type — never list Kid #1, Kid #2 separately
+- Required vs optional must be accurate based on product design`;
+    temperature = 0.2;
+
   } else {
-    return res.status(400).json({ error: 'type phải là tm-check hoặc gen-listing' });
+    return res.status(400).json({ error: 'type phải là tm-check, gen-listing, hoặc gen-personalize' });
   }
 
   const parts = [{ text: prompt }];
