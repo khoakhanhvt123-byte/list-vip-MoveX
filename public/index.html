@@ -305,7 +305,7 @@
 
 <script>
 // ─── CONFIG ──────────────────────────────────────────────
-const BLACKLIST_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTBn_d3gBo_DtApt4X_2q3mLgqgxuuqy1CCSrGJpRThoU-NMw1ARlEoCfWqxhNvDeEiBsXpvVehTPxs/pub?gid=0&single=true&output=tsv';   // <- dán link CSV Google Sheet vào đây
+const BLACKLIST_URL = '';   // <- dán link CSV Google Sheet vào đây
 
 let rows = [];
 let rowId = 0;
@@ -334,13 +334,8 @@ async function fetchBlacklist() {
       if (!line.trim()) continue;
       const cols = line.split(sep);
       // Quét tất cả cột, lấy cột nào có text không phải số
-      let val = '';
-      for (const col of cols) {
-        const c = col.replace(/^"|"$/g, '').trim();
-        if (c && !/^\d+$/.test(c) && !/^https?:\/\//i.test(c)) {
-          val = c; break;
-        }
-      }
+      const c = (cols[1] || '').replace(/^"|"$/g, '').trim();
+      let val = c;
       if (val) niches.push(val.toLowerCase());
     }
     blacklistNiches = [...new Set(niches)];
