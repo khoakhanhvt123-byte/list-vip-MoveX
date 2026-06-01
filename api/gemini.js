@@ -59,22 +59,41 @@ Rules:
 
 ${ctx}
 
-RULES FOR ANALYSIS:
-1. Look at the product carefully — identify ALL customizable elements (names, numbers, genders, poses, colors, styles, fonts, dates, messages, etc.)
-2. For each element, decide the field type:
-   - TEXT BOX: buyer needs to type free text (names, dates, messages, custom words)
-   - LIST OF OPTIONS: buyer picks from predefined choices (gender, pose/style variants, colors, fonts, sizes)
-3. For elements that repeat per person/kid/pet: group into ONE "each [person]" line showing all sub-fields
-4. For visual selection fields (poses, avatars, styles shown as images): add note "(see photo, left→right top→bottom = 1, 2, 3...)"
-5. Keep it SHORT and CLEAR — buyers must instantly understand what to provide
+═══ HARD ETSY PLATFORM LIMITS — NEVER EXCEED ═══
+- MAX 5 fields total (Etsy platform limit — this is absolute)
+- Field title: max 45 characters
+- List field: max 30 options
+- Text box instruction: max 120 characters
+- Text box character limit: 1–1024 (default 256)
 
-OUTPUT FORMAT (return ONLY valid JSON, no markdown):
+═══ CRITICAL RULE: CONSOLIDATION OVER COMPLETENESS ═══
+When a product has many option groups (branch → division → logo → rank → rank tier → name),
+you MUST consolidate into ≤5 fields using these strategies:
+
+STRATEGY A — Merge dependent options into ONE text field:
+  Instead of 4 separate list fields for [Branch / Division / Logo / Rank],
+  create ONE text field: "Enter: Branch, Division, Logo#, Rank (e.g. Marine / 1st Div / Logo 3 / Enlisted)"
+
+STRATEGY B — Use list only for the PRIMARY choice, collapse sub-options into text:
+  Field 1 (list): Service Branch → Army / Marine / Navy / Air Force / Coast Guard / Space Force
+  Field 2 (text): Branch Details → Enter division, logo number, rank (see product photos for options)
+  Field 3 (text): Custom Name → Name to appear on product, max X chars
+
+STRATEGY C — Repeat field for multi-person products:
+  ONE "repeat" field covering all per-person data instead of separate fields per person
+
+═══ FIELD TYPE DECISION ═══
+Use LIST when: ≤30 options, buyer picks ONE, options are short labels
+Use TEXT when: free input, OR when merging too many options would exceed 30 list items
+Use REPEAT when: same set of fields repeats per person/kid/pet
+
+═══ OUTPUT FORMAT (return ONLY valid JSON, no markdown) ═══
 {
   "fields": [
     {
       "type": "list",
       "title": "...",
-      "options": ["opt1", "opt2", ...],
+      "options": ["opt1", "opt2"],
       "required": true
     },
     {
@@ -87,18 +106,18 @@ OUTPUT FORMAT (return ONLY valid JSON, no markdown):
     {
       "type": "repeat",
       "label": "Each [person/kid/pet]",
-      "subfields": "Name | Boy/Girl | Pose 1-6 (see photo, left→right top→bottom = 1,2,3...)"
+      "subfields": "Name | Boy/Girl | Pose 1-6 (see photo left→right top→bottom)"
     }
   ]
 }
 
-PRINCIPLES:
-- Field titles must be specific (not generic like "Personalization")
-- List options must be exhaustive and in logical order
-- Text instructions must say WHERE/HOW the text appears on the product
-- If a visual selection exists (poses, avatars, fonts shown as images), ALWAYS add the photo-reading note
-- Repeating fields (per kid/pet/person) MUST be collapsed into one "repeat" type — never list Kid #1, Kid #2 separately
-- Required vs optional must be accurate based on product design`;
+═══ QUALITY RULES ═══
+- Total fields MUST be ≤ 5. If you need more, consolidate further.
+- Title ≤ 45 chars. Instruction ≤ 120 chars.
+- List options ≤ 30. If more, convert to text field instead.
+- For visual selections (poses, logos, avatars shown as images): use numbering with "(see photo, left→right top→bottom = 1,2,3...)"
+- Repeat fields MUST collapse all per-person data into ONE field — never list Person #1, Person #2 separately
+- required: true/false must reflect whether the product can be made without that info`;
     temperature = 0.2;
 
   } else {
