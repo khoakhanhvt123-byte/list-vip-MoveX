@@ -643,7 +643,7 @@ async function runAll() {
         title: result.title, tags: result.tags,
         imageLinks, thumbUrl,
         isLocalOnly: !!row.imageDataUrl && !row.url.trim(),
-        personalizeFields: personalizeResult?.fields || null
+        personalizeFields: sanitizePersonalizeFields(personalizeResult?.fields)
       });
     } catch(e) {
       updateCardError(cardId, e.message);
@@ -736,7 +736,7 @@ function updateCard(id, { title, tags, imageLinks, thumbUrl, isLocalOnly, person
 
     personalizeSection = `
       <div class="field">
-        <div class="field-lbl">Etsy Personalization <span class="char-ok">ready to copy</span></div>
+        <div class="field-lbl">Etsy Personalization <span class="${personalizeFields.length <= 5 ? 'char-ok' : 'char-warn'}">${personalizeFields.length}/5 fields · ready to copy</span></div>
         <div class="field-val p-fields-wrap">${rows}</div>
         <div class="action-row">
           <button class="copy-btn" id="cppersonalize-${id}">📋 Copy personalization</button>
@@ -814,6 +814,29 @@ function updateCardError(id, msg) {
       <div class="status-chip error">✕ Error</div>
       <div class="err-msg">⚠ ${escHtml(msg)}</div>
     </div>`;
+}
+
+// ─── PERSONALIZE SANITIZER ────────────────────────────────
+function sanitizePersonalizeFields(fields) {
+  if (!Array.isArray(fields)) return null;
+  const sanitized = fields
+    .slice(0, 5)
+    .map(f => {
+      const title = (f.title || f.label || '').slice(0, 45);
+      if (f.type === 'list') {
+        const options = (f.options || []).slice(0, 30);
+        if (options.length === 0) return null;
+        return { ...f, title, options };
+      } else if (f.type === 'text') {
+        const instruction = (f.instruction || '').slice(0, 120);
+        return { ...f, title, instruction };
+      } else if (f.type === 'repeat') {
+        return { ...f, label: title };
+      }
+      return f;
+    })
+    .filter(Boolean);
+  return sanitized.length > 0 ? sanitized : null;
 }
 
 // ─── UTILS ───────────────────────────────────────────────
